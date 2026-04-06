@@ -192,9 +192,9 @@ const qsa = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
 
 /* ══════════════════════════════════════════
-   6. FORMULÁRIO DE CONTATO
-   Validação + feedback simulado
-   (integre com EmailJS, Formspree, etc.)
+   6. FORMULÁRIO DE CONTATO — Formspree
+   Envia via fetch (AJAX) mantendo o visual
+   do portfólio sem redirecionar de página
    ══════════════════════════════════════════ */
 (function initForm() {
   const form     = qs('#contactForm');
@@ -203,14 +203,14 @@ const qsa = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
   if (!form) return;
 
   form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Impede reload — usamos fetch abaixo
 
     const name    = qs('#name', form).value.trim();
     const email   = qs('#email', form).value.trim();
     const message = qs('#message', form).value.trim();
     const btn     = qs('[type="submit"]', form);
 
-    // Validação simples
+    // Validação no front antes de enviar
     if (!name || !email || !message) {
       showFeedback('Por favor, preencha todos os campos.', 'error');
       return;
@@ -226,37 +226,29 @@ const qsa = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
     qs('.btn-text', btn).textContent = 'Enviando...';
     clearFeedback();
 
-    /* ─────────────────────────────────────────────────────
-       INTEGRAÇÃO REAL — descomente e configure uma opção:
+    try {
+      // Envia para o Formspree via fetch com Accept: application/json
+      // para receber resposta JSON em vez de redirecionamento
+      const res = await fetch('https://formspree.io/f/manelqjl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ name, email, message })
+      });
 
-       OPÇÃO A — Formspree (gratuito, fácil):
-       1. Crie conta em formspree.io
-       2. Crie um novo Form e copie o endpoint
-       3. Substitua a URL abaixo
-       ──────────────────────────────────────────────────── */
-    // try {
-    //   const res = await fetch('https://formspree.io/f/SEU_ID', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    //     body: JSON.stringify({ name, email, message })
-    //   });
-    //   if (res.ok) { onSuccess(); } else { onError(); }
-    // } catch { onError(); }
-
-    /* OPÇÃO B — EmailJS:
-       1. Crie conta em emailjs.com
-       2. Configure o service, template e public key
-       3. Descomente abaixo e preencha os IDs */
-    // emailjs.send('SERVICE_ID', 'TEMPLATE_ID', { name, email, message }, 'PUBLIC_KEY')
-    //   .then(onSuccess, onError);
-
-    /* ─────────────────────────────────────────────────────
-       SIMULAÇÃO (remova quando integrar serviço real)
-       ──────────────────────────────────────────────────── */
-    setTimeout(() => {
-      // Simula sucesso — troque por onSuccess() ou onError() após integrar
-      onSuccess();
-    }, 1500);
+      if (res.ok) {
+        onSuccess();
+      } else {
+        // Formspree retorna erros no corpo JSON
+        const data = await res.json();
+        const errMsg = data?.errors?.[0]?.message || 'Erro ao enviar.';
+        onError(errMsg);
+      }
+    } catch (err) {
+      onError('Falha de conexão. Tente pelo LinkedIn.');
+    }
 
     function onSuccess() {
       showFeedback('✓ Mensagem enviada! Entrarei em contato em breve.', 'success');
@@ -265,8 +257,8 @@ const qsa = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
       qs('.btn-text', btn).textContent = 'Enviar Mensagem';
     }
 
-    function onError() {
-      showFeedback('Erro ao enviar. Tente pelo LinkedIn ou e-mail.', 'error');
+    function onError(msg) {
+      showFeedback(msg || 'Erro ao enviar. Tente pelo LinkedIn ou e-mail.', 'error');
       btn.disabled = false;
       qs('.btn-text', btn).textContent = 'Enviar Mensagem';
     }
